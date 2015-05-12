@@ -1,0 +1,58 @@
+start on startup
+
+# we just fake the network coming up, lxc did this for us
+
+emits net-device-up
+
+script 
+        <% #providerA %>
+        <% if @node["virtualization"]["provider"] == "providerA" %>
+        ip route add default via <%= @gateway[:ip] %> dev <%= @gateway[:dev]%>
+        <% unless @ipv6gw.empty? %>
+        ip -f inet6 route add <%=@ipv6gw%> dev public
+        ip -f inet6 route add default via <%=@ipv6gw%>
+        <%end%>
+        <% unless @ipv6gw.empty? %>
+        #        ping6 -c 5 <%=@ipv6gw%>
+        <%end%>
+        #if ping -c 5 8.8.8.8 ; then
+        /sbin/initctl emit --no-wait net-device-up IFACE=lo
+        /sbin/initctl emit --no-wait net-device-up IFACE=public
+        /sbin/initctl emit --no-wait net-device-up IFACE=private
+        #fi
+        <%end%>
+        ip -f inet6 route add 00::/64 dev public
+        ip -f inet6 route add 01::/64 dev private
+        ip -f inet6 route add 02::/64 dev public
+        ip -f inet6 route add 03::/64 dev private
+        ip -f inet6 route add 04::/64 dev private
+        #route for vpn to providerB and roadwarrioer over access01/access02 vrrp ip
+        <% node["vpn"]["route"]["providerA"].each do |name,networks|%>
+        #<%= name %>
+        <% networks.each do |type,network|%> 
+        <% if type == "ipv6"; vpngw=@vpngw6; else vpngw=@vpngw4; end%>
+        <% network.each do |net|%>
+        ip <% if type=="ipv6" %>-f inet6<%end%> route add <%=net%> via <%=vpngw%> dev private
+        <%end%>
+        <%end%>
+        <%end%>
+       
+       <% #ProviderB %>
+        <% if @node["virtualization"]["provider"] == "providerB" %>
+        ip route add default via <%= node["providerB"]["gateway"]%> dev private
+        if ping -c 5 8.8.8.8 ; then
+        	/sbin/initctl emit --no-wait net-device-up IFACE=lo
+        	/sbin/initctl emit --no-wait net-device-up IFACE=private
+        fi
+        # lxc on providerB do not add ipv6, so we add it here
+                ip address add <%= @guest["private_ipv6"] %> dev private
+        <% node["vpn"]["route"]["providerB"].each do |name,networks|%>
+        <% networks.each do |type,network|%> 
+        <% if type == "ipv6"; vpngw=@vpngw6; else vpngw=@vpngw4; end%>
+        <% network.each do |net|%>
+                ip<% if type=="ipv6" %> -f inet6<%end%> route add <%=net%> via <%=vpngw%> dev private
+        <%end%>
+        <%end%>
+        <%end%>
+        <% end %>
+end script

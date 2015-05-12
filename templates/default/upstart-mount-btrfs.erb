@@ -1,0 +1,22 @@
+# mount-btrfs-vm - Mounting btrfs volume on VMt
+#
+# Mount Btrfs VM mount all filesystem in btrfs
+
+description "Mount Btrfs Vm"
+
+start on local-filesystems
+stop on runlevel [!2345]
+
+exec true
+
+post-start script
+<% @mount_line.each do |line|%>
+  <%=line%>
+<%end%>
+end script
+
+pre-stop script
+<% @mount_line.each do |line|%>
+  <%=line.gsub('mount','umount')%>
+<%end%>
+end script

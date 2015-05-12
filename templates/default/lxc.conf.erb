@@ -1,0 +1,80 @@
+lxc.utsname = <%= @hostname %>
+lxc.tty = 4
+lxc.pts = 1024
+
+#Vpriv
+lxc.network.type = veth
+lxc.network.flags = up
+<% if node["providerA"] %>
+<% if node["providerA"]["net"] == "1.0"%>
+lxc.network.link = br0.<%= @vlanid %>
+<%end%>
+<% if node["providerA"]["net"] == "1.5"%>
+lxc.network.link = br0
+<%end%>
+<%end%>
+<% if node["providerB"] %>
+lxc.network.link = br0
+<%end%>
+lxc.network.name = private
+lxc.network.mtu = 1500
+lxc.network.ipv4 = <%= @guest[:private_ipv4] %>
+<%if @guest[:private_ipv6] %>
+lxc.network.ipv6 = <%= @guest[:private_ipv6] %>
+<%end%>
+lxc.network.veth.pair = vpriv<%= @guestslug %>
+
+<%if @guest[:public_ipv6] or  @guest[:public_ipv4] %>
+# Vpub
+lxc.network.type = veth
+lxc.network.flags = up
+<% if node["providerA"] %>
+<% if node["providerA"]["net"] == "1.0"%>
+lxc.network.link = br0.<%= @vlanid %>
+<%end%>
+<% if node["providerA"]["net"] == "1.5"%>
+lxc.network.link = br0
+<%end%>
+<%end%>
+<% if @guest[:public_ipv4] or @guest[:public_ipv6]%>
+lxc.network.name = public
+lxc.network.mtu = 1500
+<%if @guest[:public_ipv4] %>
+lxc.network.ipv4 = <%= @guest[:public_ipv4] %>
+<%end%>
+<%if @guest[:public_ipv6] %>
+lxc.network.ipv6 = <%= @guest[:public_ipv6] %>
+## Bug if private/public have ipv6
+#lxc.network.ipv6.gateway = <%= @ipv6gw%>
+<%end%>
+<%end%>
+lxc.network.veth.pair = vpub<%= @guestslug %>
+<%end%>
+
+lxc.rootfs = <%= @rootfs %>
+<% unless node["virtualization"]["provider"] == "providerC"%>
+lxc.mount = <%= @home %>/fstab
+<%end%>
+lxc.cgroup.devices.deny = a
+# /dev/null and zero
+lxc.cgroup.devices.allow = c 1:3 rwm
+lxc.cgroup.devices.allow = c 1:5 rwm
+# consoles
+lxc.cgroup.devices.allow = c 5:1 rwm
+lxc.cgroup.devices.allow = c 5:0 rwm
+lxc.cgroup.devices.allow = c 4:0 rwm
+lxc.cgroup.devices.allow = c 4:1 rwm
+# /dev/{,u}random
+lxc.cgroup.devices.allow = c 1:9 rwm
+lxc.cgroup.devices.allow = c 1:8 rwm
+# /dev/pts/* - pts namespaces are "coming soon"
+lxc.cgroup.devices.allow = c 136:* rwm
+lxc.cgroup.devices.allow = c 5:2 rwm
+# rtc
+lxc.cgroup.devices.allow = c 254:0 rwm
+# fuse
+lxc.cgroup.devices.allow = c 10:229 rwm
+
+<% (@bigdir or []).each do |key| %>
+lxc.mount.entry = <%= @data_path%>/<%= @guest["id"] %>_<%= key["DEVICE"]%> <%= @rootfs %><%= key["PATH"]%> none <%=key["OPTIONS"]%> 0 2
+<% end -%>
